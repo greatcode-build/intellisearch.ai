@@ -1,6 +1,11 @@
-import { CircleUserRound, Menu, MessageSquare, PanelRight } from "lucide-react";
+"use client";
+
+import { Menu, MessageSquare, PanelRight } from "lucide-react";
 import Image from "next/image";
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
+import { useClerk, UserButton } from "@clerk/nextjs";
+import { useAppContext } from "../context/AppContext";
+import { ChatLabel } from "./ChatLabel";
 
 type SideBarProps = {
   expand: boolean;
@@ -8,6 +13,10 @@ type SideBarProps = {
 };
 
 const SideBar = ({ expand, setExpand }: SideBarProps) => {
+  const { openSignIn } = useClerk();
+  const { user } = useAppContext();
+  const [openMenu, setOpenMenu] = useState({ id: 0, open: false });
+
   return (
     <div
       className={`bg-[#212327]  flex flex-col justify-between transition-all pt-7 z-50 max-md:absolute max-md:h-screen ${expand ? "p-4 w-64" : "md:w-20 w-0 max-md:overflow-hidden"}`}
@@ -71,6 +80,7 @@ const SideBar = ({ expand, setExpand }: SideBarProps) => {
           className={`mt-8 text-white/25 text-sm ${expand ? "block" : "hidden"}`}
         >
           <p className="my-1">Recent</p>
+          <ChatLabel openMenu={openMenu} setOpenMenu={setOpenMenu} />
         </div>
       </div>
       <div>
@@ -99,9 +109,21 @@ const SideBar = ({ expand, setExpand }: SideBarProps) => {
           )}
         </div> */}
         <div
+          onClick={() => {
+            if (!user) openSignIn();
+          }}
           className={`flex items-center ${expand ? "hover:bg-white/10 rounded-lg" : "justify-center w-full"} gap-3 text-white/60 text-sm p-2 mt-2 cursor-pointer`}
         >
-          <CircleUserRound className="text-white" size={20} />
+          {user ? (
+            <UserButton />
+          ) : (
+            <Image
+              src="/profile-picture.png"
+              width={30}
+              height={30}
+              alt="profile"
+            />
+          )}
           {expand && <span>My Profile</span>}
         </div>
       </div>
