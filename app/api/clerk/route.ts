@@ -1,48 +1,59 @@
-import { Webhook } from "svix";
-import User from "@/app/models/User";
-import { connectDB } from "@/app/config/db";
-import { headers } from "next/headers";
+import { verifyWebhook } from "@clerk/nextjs/webhooks";
+import type { WebhookEvent } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  const webHook = new Webhook(process.env.SIGNING_SECRET!);
-  const headerPayload = headers();
+import User from "@/app/models/User";
+import { connectDB } from "@/app/config/db";
 
-  const svixHeaders = {
-    "svix-id": headerPayload.get("svix-id"),
-    "svix-signature": headerPayload.get("svix-signature"),
-    "svix-timestamp": headerPayload.get("svix-timestamp"),
-  };
+type ClerkUserEvent = Extract<
+  WebhookEvent,
+  { type: "user.created" | "user.updated" }
+>;
 
-  //Get payload and verify it
-  const payload = await req.json();
-  const body = JSON.stringify(payload);
-
-  const { data, type } = webHook.verify(body, svixHeaders);
-
-  //Prepare user data to be stored in the database
-
-  const userData = {
+function mapClerkUser(data: ClerkUserEvent["data"]) {
+  return {
     _id: data.id,
-    email: data.email_addresses[0].email_address,
-    name: `${data.first_name} ${data.last_name}`,
+    email: data.email_addresses[0]?.email_address,
+    name: `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim(),
     image: data.image_url,
   };
-  await connectDB();
+}
 
-  switch (type) {
-    case "user.created":
-      await User.create(userData);
-      break;
-    case "user.updated":
-      await User.findByIdAndUpdate(data.id, userData);
-      break;
-    case "user.deleted":
-      await User.findByIdAndDelete(data.id);
-      break;
+export async function POST(req: NextRequest) {
+  try {
+    const event = await verifyWebhook(req);
 
-    default:
-      break;
+    await connectDB();
+
+    switch (event.type) {
+      case "user.created":
+        await User.create(mapClerkUser(event.data));
+        break;
+
+      case "user.updated":
+        await User.findByIdAndUpdate(event.data.id, mapClerkUser(event.data), {
+          new: true,
+          upsert: true,
+        });
+        break;
+
+      case "user.deleted":
+        if (event.data.id) {
+          await User.findByIdAndDelete(event.data.id);
+        }
+        break;
+
+      default:
+        break;
+    }
+
+    return NextResponse.json({ message: "Webhook received" }, { status: 200 });
+  } catch (error) {
+    console.error("Clerk webhook error:", error);
+
+    return NextResponse.json(
+      { message: "Webhook verification failed" },
+      { status: 400 },
+    );
   }
-  return NextResponse.json({ message: "Event received" });
 }
