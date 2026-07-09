@@ -10,7 +10,6 @@ import Image from "next/image";
 const Message = ({ role, content }: { role: string; content: string }) => {
   return (
     <div className="flex flex-col items-center text-sm w-full max-w-3xl">
-      <p>Message content here</p>
       <div
         className={`flex flex-col w-full mb-8 ${role === "user" && "items-end"}`}
       >
