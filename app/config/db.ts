@@ -23,7 +23,7 @@ export async function connectDB() {
   }
 
   if (!cached.promise) {
-    const mongoUri = process.env.MONGO_URI;
+    const mongoUri = process.env.MONGODB_URI;
 
     if (!mongoUri) {
       throw new Error("MONGO_URI is not defined");
@@ -32,7 +32,11 @@ export async function connectDB() {
     cached.promise = mongoose.connect(mongoUri);
   }
 
-  cached.conn = await cached.promise;
-
-  return cached.conn;
+  try {
+    cached.conn = await cached.promise;
+    return cached.conn;
+  } catch (error) {
+    cached.promise = null;
+    throw error;
+  }
 }
